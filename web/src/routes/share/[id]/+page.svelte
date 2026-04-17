@@ -69,9 +69,14 @@
 
   <section class="stage">
     <div class="frame">
-      <video controls playsinline preload="auto">
-        <source src={data.downloadUrl} type="video/mp4" />
-      </video>
+      <video
+        controls
+        playsinline
+        preload="auto"
+        crossorigin="anonymous"
+        poster="/favicon.svg"
+        src={data.downloadUrl}
+      ></video>
     </div>
   </section>
 
@@ -144,8 +149,9 @@
 
   .frame {
     position: relative;
-    max-width: 520px;
+    max-width: 460px;
     width: 100%;
+    aspect-ratio: 9 / 16;
     border: 1px solid var(--rule);
     border-radius: var(--radius-md);
     overflow: hidden;
@@ -155,8 +161,7 @@
   video {
     display: block;
     width: 100%;
-    height: auto;
-    max-height: 80vh;
+    height: 100%;
     object-fit: contain;
     background: #000;
   }
