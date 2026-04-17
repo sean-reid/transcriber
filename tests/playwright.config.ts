@@ -6,10 +6,10 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: CI,
   retries: CI ? 2 : 0,
-  workers: CI ? 2 : undefined,
+  workers: 1,
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: BASE_URL,
