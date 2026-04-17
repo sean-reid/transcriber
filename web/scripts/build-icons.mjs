@@ -15,7 +15,10 @@ const sizes = [
 ];
 
 for (const { name, size } of sizes) {
-  const buf = await sharp(src, { density: 600 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer();
+  const buf = await sharp(src, { density: 600 })
+    .resize(size, size)
+    .png({ compressionLevel: 9 })
+    .toBuffer();
   await writeFile(resolve(staticDir, name), buf);
   console.log(`wrote static/${name} (${size}x${size})`);
 }
