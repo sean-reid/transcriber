@@ -8,7 +8,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
-from . import audio, compose, notation, rendering, transcription
+from . import (
+    apparatus,
+    audio,
+    classify,
+    compose,
+    monophonic,
+    notation,
+    rendering,
+    transcription,
+)
 
 
 @dataclass(frozen=True)
@@ -48,15 +57,35 @@ def transcribe(
 
     t1 = perf_counter()
     mark("detecting", {"label": "detecting notes"})
-    midi = transcription.polyphonic_transcribe(wav_path)
+    classification = classify.classify(wav_path)
+    if classification.is_music:
+        midi = transcription.polyphonic_transcribe(wav_path)
+        branch = "polyphonic"
+    else:
+        midi = monophonic.transcribe_monophonic(wav_path)
+        branch = "monophonic"
+
+    features_preview = apparatus.analyze(wav_path)
+    _retime_midi(midi, features_preview.tempo_bpm)
+
     midi_path = transcription.write_midi(midi, output_dir / "transcription.mid")
     note_count = sum(len(inst.notes) for inst in midi.instruments)
     timings["detect"] = perf_counter() - t1
-    mark("detecting", {"notes": note_count})
+    mark(
+        "detecting",
+        {
+            "notes": note_count,
+            "branch": branch,
+            "flatness": round(classification.flatness, 3),
+            "onset_density": round(classification.onset_density, 3),
+            "tempogram_peak": round(classification.tempogram_peak, 3),
+        },
+    )
 
     t2 = perf_counter()
     mark("rendering", {"label": "engraving notation"})
     score = notation.midi_to_score(midi_path)
+    apparatus.decorate(score, features_preview)
     xml_path = notation.write_musicxml(score, output_dir / "transcription.musicxml")
     cards_dir = output_dir / "cards"
     cards = rendering.render_measure_cards(xml_path, cards_dir)
@@ -98,6 +127,27 @@ def cli(argv: list[str] | None = None) -> int:
         _emit_event("failed", {"message": str(err)})
         return 1
     return 0
+
+
+def _retime_midi(midi, bpm: float) -> None:
+    """Stamp the detected tempo onto the MIDI so music21 parses beats correctly.
+
+    pretty_midi doesn't expose initial-tempo mutation directly; we edit the
+    underlying tempo change array through its private API, which is stable
+    across versions. Fallback: leave the MIDI alone if anything goes wrong.
+    """
+    if not (20 < bpm < 400):
+        return
+    try:
+        import numpy as np
+
+        tick_scales = 60.0 / (bpm * midi.resolution)
+        midi._tick_scales = [(0, tick_scales)]
+        midi._update_tick_to_time(midi.get_end_time() * bpm / 60.0 * midi.resolution + 1)
+        midi.initial_tempo = bpm
+        _ = np
+    except Exception:
+        return
 
 
 if __name__ == "__main__":

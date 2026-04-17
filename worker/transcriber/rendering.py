@@ -1,4 +1,10 @@
-"""Score rendering: MusicXML → per-measure PNG cards via Verovio + Playwright."""
+"""Score rendering: MusicXML → per-measure PNG cards via Verovio + Playwright.
+
+Each card shows a single measure. When a measure's last note has a tie that
+extends into the next measure, the excerpt temporarily includes that next
+measure so the tie arc can render correctly, then the card is cropped back to
+the current measure's bounding box.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import verovio
-from music21 import converter, stream
+from music21 import clef, converter, stream
 from playwright.sync_api import sync_playwright
 
 CARD_WIDTH_PX = 1080
@@ -43,7 +49,7 @@ _HTML_TEMPLATE = """<!doctype html>
     display: block;
   }}
   .card svg text {{ fill: #111; }}
-  .card svg path {{ fill: #111; }}
+  .card svg path {{ fill: currentColor; stroke: currentColor; }}
 </style></head>
 <body>
   <div class="card">{svg}</div>
@@ -70,30 +76,51 @@ def _toolkit() -> verovio.toolkit:
             "svgRemoveXlink": True,
             "smuflTextFont": "embedded",
             "systemDivider": "none",
-            "hideEmptyStaves": False,
+            "header": "none",
+            "footer": "none",
         }
     )
     return tk
 
 
-def _excerpt_window(score: stream.Score, measure_index: int, lookahead: int = 1) -> stream.Score:
-    """Excerpt the current measure plus a lookahead window so ties to the
-    following measure render as proper arcs rather than being clipped off.
-    """
-    end = measure_index + lookahead
+def _measure_extends_into_next(score: stream.Score, measure_index: int) -> bool:
+    """True when any note in this measure has a tie going forward."""
+    excerpt = score.measures(
+        measure_index,
+        measure_index,
+        collect=("Clef", "TimeSignature", "KeySignature", "Instrument"),
+    )
+    if excerpt is None:
+        return False
+    for note in excerpt.recurse().notes:
+        tie = getattr(note, "tie", None)
+        if tie is not None and tie.type in {"start", "continue"}:
+            return True
+    return False
+
+
+def _excerpt_for_render(score: stream.Score, measure_index: int) -> stream.Score:
+    """One measure, plus one-measure lookahead only when a tie forces it."""
+    end = measure_index + 1 if _measure_extends_into_next(score, measure_index) else measure_index
     excerpt = score.measures(
         measure_index,
         end,
         collect=("Clef", "TimeSignature", "KeySignature", "Instrument"),
     )
-    if excerpt is None or not excerpt.recurse().getElementsByClass("Measure"):
-        excerpt = score.measures(
-            measure_index,
-            measure_index,
-            collect=("Clef", "TimeSignature", "KeySignature", "Instrument"),
-        )
     if excerpt is None:
         raise ValueError(f"measure {measure_index} missing")
+
+    source_parts = list(score.parts) or [score]
+    target_parts = list(excerpt.parts) or [excerpt]
+    for src, tgt in zip(source_parts, target_parts, strict=False):
+        first_measure = next(iter(tgt.getElementsByClass("Measure")), None)
+        if first_measure is None:
+            continue
+        already = any(isinstance(e, clef.Clef) for e in first_measure.elements)
+        if not already:
+            src_clef = next(iter(src.recurse().getElementsByClass(clef.Clef)), None)
+            if src_clef is not None:
+                first_measure.insert(0, type(src_clef)())
     return excerpt
 
 
@@ -137,11 +164,12 @@ def render_measure_cards(musicxml_path: Path, output_dir: Path) -> list[MeasureC
             browser = pw.chromium.launch(args=["--disable-web-security"])
             try:
                 for idx, start, end in timings:
-                    excerpt = _excerpt_window(score, idx)
+                    excerpt = _excerpt_for_render(score, idx)
                     excerpt.write("musicxml", fp=str(tmp_xml))
 
                     tk = _toolkit()
-                    if not tk.loadFile(str(tmp_xml)):
+                    xml_text = tmp_xml.read_text(encoding="utf-8")
+                    if not tk.loadData(xml_text):
                         raise RuntimeError(f"verovio failed to load measure {idx}")
                     svg = tk.renderToSVG(1)
 
