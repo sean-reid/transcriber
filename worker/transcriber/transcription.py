@@ -37,7 +37,6 @@ def polyphonic_transcribe(wav_path: Path) -> pretty_midi.PrettyMIDI:
             multiple_pitch_bends=False,
             melodia_trick=True,
         )
-    _strip_octave_ghosts(midi_data)
     _fill_small_gaps(midi_data)
     return midi_data
 
@@ -57,40 +56,6 @@ def _fill_small_gaps(midi: pretty_midi.PrettyMIDI, max_gap: float = 0.15) -> Non
             if 0 < gap <= max_gap:
                 current.end = following.start
         instrument.notes = notes
-
-
-def _strip_octave_ghosts(
-    midi: pretty_midi.PrettyMIDI,
-    *,
-    onset_window: float = 0.06,
-    shorter_ratio: float = 0.6,
-) -> None:
-    """Remove notes that are exactly N octaves above a co-onset longer note.
-
-    Basic Pitch often tags the 2nd/3rd harmonic of a fundamental as a short
-    note one or two octaves above the real pitch. Real notes don't typically
-    start at the same instant at exactly 12/24 semitones apart, so this is a
-    safe cleanup.
-    """
-    for instrument in midi.instruments:
-        # Sort by onset, then by pitch ascending so the fundamental is
-        # considered before its octave partials at the same time.
-        notes = sorted(instrument.notes, key=lambda n: (n.start, n.pitch))
-        keep: list[pretty_midi.Note] = []
-        for candidate in notes:
-            cand_dur = candidate.end - candidate.start
-            is_ghost = False
-            for other in keep:
-                if abs(other.start - candidate.start) > onset_window:
-                    continue
-                other_dur = other.end - other.start
-                pitch_diff = candidate.pitch - other.pitch
-                if pitch_diff in (12, 24) and cand_dur < shorter_ratio * other_dur:
-                    is_ghost = True
-                    break
-            if not is_ghost:
-                keep.append(candidate)
-        instrument.notes = keep
 
 
 def write_midi(midi: pretty_midi.PrettyMIDI, out_path: Path) -> Path:
