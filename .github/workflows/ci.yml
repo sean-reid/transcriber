@@ -65,6 +65,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: uv sync --frozen
         working-directory: worker
+      - name: Cache Playwright (Python) browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-py-${{ runner.os }}-${{ hashFiles('worker/uv.lock') }}
+      - name: Install Chromium for rendering
+        run: uv run playwright install --with-deps chromium
+        working-directory: worker
       - name: Pytest (all markers)
         run: uv run pytest -m "slow or not slow" --maxfail=1
         working-directory: worker
@@ -94,14 +102,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: uv sync --frozen
         working-directory: worker
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter web build
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - run: pnpm --filter tests exec playwright install --with-deps chromium webkit
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'worker/uv.lock') }}
+      - name: Install Chromium for Python worker rendering
+        run: uv run playwright install --with-deps chromium
+        working-directory: worker
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web build
+      - run: pnpm --filter tests exec playwright install --with-deps webkit
       - run: pnpm --filter tests test
       - uses: actions/upload-artifact@v4
         if: always()
