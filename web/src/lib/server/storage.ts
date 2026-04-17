@@ -11,9 +11,12 @@ export type StorageObject = {
   contentType: string;
 };
 
+export type StorageRange = { start: number; end: number };
+
 export interface Storage {
   put(key: string, body: ReadableStream<Uint8Array>, contentType: string): Promise<void>;
-  get(key: string): Promise<StorageObject | null>;
+  get(key: string, range?: StorageRange): Promise<StorageObject | null>;
+  size(key: string): Promise<number | null>;
   exists(key: string): Promise<boolean>;
   delete(key: string): Promise<void>;
   publicUrl(key: string, ttlSeconds: number): Promise<string>;
@@ -49,17 +52,20 @@ export class LocalStorage implements Storage {
     await writeFile(path + META_SUFFIX, JSON.stringify({ contentType }), 'utf8');
   }
 
-  async get(key: string): Promise<StorageObject | null> {
+  async get(key: string, range?: StorageRange): Promise<StorageObject | null> {
     const path = this.localPath(key);
-    let size: number;
+    let fullSize: number;
     try {
       const s = await stat(path);
-      size = s.size;
+      fullSize = s.size;
     } catch {
       return null;
     }
     const contentType = await this.#readContentType(path);
-    const web = Readable.toWeb(createReadStream(path)) as unknown as ReadableStream<Uint8Array>;
+    const options = range ? { start: range.start, end: range.end } : undefined;
+    const node = createReadStream(path, options);
+    const web = Readable.toWeb(node) as unknown as ReadableStream<Uint8Array>;
+    const size = range ? range.end - range.start + 1 : fullSize;
     return { stream: web, size, contentType };
   }
 
@@ -79,6 +85,15 @@ export class LocalStorage implements Storage {
 
   async publicUrl(key: string, _ttlSeconds: number): Promise<string> {
     return `${this.#baseUrl}/${encodeURI(key)}`;
+  }
+
+  async size(key: string): Promise<number | null> {
+    try {
+      const s = await stat(this.localPath(key));
+      return s.size;
+    } catch {
+      return null;
+    }
   }
 
   async #readContentType(path: string): Promise<string> {
