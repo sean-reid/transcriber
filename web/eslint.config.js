@@ -28,6 +28,14 @@ export default [
     }
   },
   {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
+      ]
+    }
+  },
+  {
     files: ['**/app.d.ts'],
     rules: {
       '@typescript-eslint/no-empty-object-type': 'off'
