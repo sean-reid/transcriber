@@ -2,9 +2,15 @@
 name = "transcriber-worker"
 version = "0.0.0"
 description = "Audio-to-notation pipeline running on Modal."
-requires-python = ">=3.12"
+requires-python = ">=3.11,<3.12"
 dependencies = [
   "modal>=0.73.0",
+  "numpy>=1.26,<2",
+  "librosa>=0.10.2",
+  "basic-pitch[onnx]>=0.4.0",
+  "setuptools>=70,<75",
+  "pretty_midi>=0.2.10",
+  "music21>=9.3.0",
 ]
 
 [dependency-groups]
@@ -16,7 +22,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [
@@ -38,6 +44,10 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+  "slow: integration test that loads ML models (skipped by default)",
+]
+addopts = "-m 'not slow'"
 
 [tool.hatch.build.targets.wheel]
 packages = ["transcriber"]

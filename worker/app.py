@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import modal
 
-image = modal.Image.debian_slim(python_version="3.12").apt_install("ffmpeg")
+image = modal.Image.debian_slim(python_version="3.11").apt_install("ffmpeg")
 
 app = modal.App("transcriber", image=image)
 
