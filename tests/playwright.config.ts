@@ -1,0 +1,33 @@
+import { defineConfig, devices } from '@playwright/test';
+
+const PORT = Number(process.env.PORT ?? 4173);
+const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
+const CI = !!process.env.CI;
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: CI,
+  retries: CI ? 2 : 0,
+  workers: CI ? 2 : undefined,
+  reporter: [['html', { open: 'never' }], ['list']],
+  use: {
+    baseURL: BASE_URL,
+    trace: 'on-first-retry',
+    video: 'retain-on-failure',
+    screenshot: 'only-on-failure'
+  },
+  projects: [
+    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'iphone-15', use: { ...devices['iPhone 15'] } },
+    { name: 'pixel-7', use: { ...devices['Pixel 7'] } }
+  ],
+  webServer: {
+    command: `pnpm --filter web preview --port ${PORT} --strictPort`,
+    port: PORT,
+    reuseExistingServer: !CI,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    timeout: 120_000
+  }
+});
