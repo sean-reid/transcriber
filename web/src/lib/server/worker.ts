@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import type { JobRegistry, Stage } from './jobs';
 import type { LocalStorage } from './storage';
 
-const STAGE_PAUSE_MS = 200;
+const STAGE_PAUSE_MS = 700;
 
 export interface Worker {
   enqueue(jobId: string, inputKey: string): Promise<string>;

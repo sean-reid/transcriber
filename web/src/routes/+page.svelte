@@ -6,8 +6,6 @@
   import { uploadVideo } from '$lib/client/upload';
   import { MAX_DURATION_SECONDS, MAX_FILE_BYTES, ACCEPTED_MIME } from '$lib/shared/config';
 
-  let filePicker: HTMLInputElement;
-  let captureInput: HTMLInputElement;
   let dragActive = $state(false);
   let busy = $state(false);
   let errorText = $state<string | null>(null);
@@ -38,7 +36,7 @@
     }
   }
 
-  function pick(ev: Event) {
+  function onFileChange(ev: Event) {
     const file = (ev.target as HTMLInputElement).files?.[0];
     if (file) void handle(file);
   }
@@ -68,26 +66,23 @@
     </span>
   </header>
 
-  <div
+  <label
     class="drop"
     class:drag={dragActive}
     class:busy
-    role="button"
-    tabindex="0"
-    aria-label="Drop a video or click to choose"
-    onclick={() => filePicker?.click()}
-    onkeydown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        filePicker?.click();
-      }
-    }}
     ondrop={onDrop}
     ondragover={onDragOver}
     ondragleave={onDragLeave}
   >
+    <input
+      id="file-upload"
+      type="file"
+      accept={ACCEPTED_MIME.join(',')}
+      class="sr-only"
+      onchange={onFileChange}
+    />
     <DropStaff hover={dragActive} busy={!!busy} />
-    <div class="drop-label">
+    <span class="drop-label">
       {#if busy}
         <span class="mono">uploading</span>
       {:else if dragActive}
@@ -95,36 +90,21 @@
       {:else}
         <span class="mono">drop a clip, or click to choose one</span>
       {/if}
-    </div>
-    <input
-      bind:this={filePicker}
-      type="file"
-      accept={ACCEPTED_MIME.join(',')}
-      hidden
-      onchange={pick}
-    />
-  </div>
+    </span>
+  </label>
 
   <div class="meta">
     <span class="mono">mp4 &middot; mov &middot; webm &middot; up to 30 seconds</span>
-    <button
-      type="button"
-      class="link"
-      onclick={(e) => {
-        e.stopPropagation();
-        captureInput?.click();
-      }}
-    >
+    <label class="link">
       <input
-        bind:this={captureInput}
         type="file"
         accept="video/*"
         capture="environment"
-        hidden
-        onchange={pick}
+        class="sr-only"
+        onchange={onFileChange}
       />
       record with camera
-    </button>
+    </label>
   </div>
 
   {#if errorText}
@@ -163,12 +143,14 @@
 
   .drop {
     position: relative;
+    display: block;
     padding: 0 0 var(--space-2);
     cursor: pointer;
     user-select: none;
   }
 
   .drop-label {
+    display: block;
     text-align: center;
     color: var(--ink-soft);
     font-size: var(--step--1);
@@ -184,6 +166,14 @@
     cursor: progress;
   }
 
+  .drop:focus-within {
+    outline: none;
+  }
+
+  .drop:focus-within .drop-label {
+    color: var(--ink);
+  }
+
   .meta {
     display: flex;
     align-items: center;
@@ -196,8 +186,7 @@
   }
 
   .link {
-    background: transparent;
-    border: 0;
+    display: inline-block;
     padding: 0;
     color: var(--ink);
     cursor: pointer;
@@ -212,6 +201,18 @@
 
   .link:hover {
     text-decoration-color: var(--accent);
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .error {
