@@ -95,7 +95,7 @@
 
   <div class="meta">
     <span class="mono">mp4 &middot; mov &middot; webm &middot; up to 30 seconds</span>
-    <label class="link">
+    <label class="link record-link">
       <input
         type="file"
         accept="video/*"
@@ -201,6 +201,16 @@
 
   .link:hover {
     text-decoration-color: var(--accent);
+  }
+
+  .record-link {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .record-link {
+      display: inline-block;
+    }
   }
 
   .sr-only {
