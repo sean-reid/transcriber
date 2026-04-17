@@ -112,7 +112,7 @@ jobs:
         working-directory: worker
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
-      - run: pnpm --filter tests exec playwright install --with-deps webkit
+      - run: pnpm --filter tests exec playwright install --with-deps chromium webkit
       - run: pnpm --filter tests test
       - uses: actions/upload-artifact@v4
         if: always()
