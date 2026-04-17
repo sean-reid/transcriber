@@ -60,61 +60,65 @@ def midi_to_score(midi_path: Path, bpm: float | None = None) -> stream.Score:
     for part in (treble, bass):
         part.makeMeasures(inPlace=True)
         part.makeRests(inPlace=True, fillGaps=True, timeRangeFromBarDuration=True)
-        part.makeNotation(inPlace=True)
         # Consolidate tied same-pitch chains into single longer notes so that,
-        # e.g., two tied quarter notes become a half. Leaves ties alone when
-        # the summed duration can't fit a single note value (respects meter).
+        # e.g., two tied quarter notes become a half. Runs before makeNotation
+        # so makeNotation's re-tying respects the simplified durations.
         part.stripTies(inPlace=True, matchByPitch=True)
+        part.makeNotation(inPlace=True)
 
     _mark_long_holds(score, LONG_HOLD_SECONDS)
     return score
 
 
 def _mark_long_holds(score: stream.Score, threshold_seconds: float) -> None:
-    """Attach a fermata to the head of any tied chain (or rest) whose total
-    duration is long enough that the reader should treat it as a hold.
-
-    This is content-agnostic: applies equally to a 5-second sine-wave drone,
-    a held vowel in speech, and a deliberately held note in a song.
+    """Attach a fermata to the head of any tied chain whose total duration
+    exceeds the threshold, so the reader treats it as a hold. Works for
+    sustained drones, held vowels, and held notes inside metered music.
     """
+    ql_to_seconds = _detect_ql_to_seconds(score)
+
     for part in score.parts:
-        chain_head = None
-        chain_seconds = 0.0
+        elements = list(part.recurse().notes)  # notes only; rests are handled elsewhere
+        i = 0
+        while i < len(elements):
+            head = elements[i]
+            head_tie_type = head.tie.type if head.tie is not None else None
+            if head_tie_type in ("continue", "stop"):
+                i += 1
+                continue
 
-        def seconds_for(element) -> float:
-            try:
-                return float(element.seconds)
-            except Exception:
-                return float(element.duration.quarterLength) * 0.5
+            total_seconds = float(head.duration.quarterLength) * ql_to_seconds
+            j = i + 1
+            while j < len(elements):
+                nxt = elements[j]
+                tie_type = nxt.tie.type if nxt.tie is not None else None
+                if tie_type in ("continue", "stop"):
+                    total_seconds += float(nxt.duration.quarterLength) * ql_to_seconds
+                    if tie_type == "stop":
+                        j += 1
+                        break
+                    j += 1
+                else:
+                    break
 
-        def close_chain():
-            nonlocal chain_head, chain_seconds
             if (
-                chain_head is not None
-                and chain_seconds >= threshold_seconds
-                and not any(isinstance(x, expressions.Fermata) for x in chain_head.expressions)
+                total_seconds >= threshold_seconds
+                and hasattr(head, "expressions")
+                and not any(isinstance(x, expressions.Fermata) for x in head.expressions)
             ):
-                chain_head.expressions.append(expressions.Fermata())
-            chain_head = None
-            chain_seconds = 0.0
+                head.expressions.append(expressions.Fermata())
 
-        for element in part.recurse().notesAndRests:
-            tie = getattr(element, "tie", None)
-            tie_type = tie.type if tie is not None else None
+            i = max(j, i + 1)
 
-            if tie_type in (None, "start"):
-                close_chain()
-                chain_head = element
-                chain_seconds = seconds_for(element)
-                if tie_type is None:
-                    close_chain()
-            elif tie_type in ("continue", "stop"):
-                if chain_head is None:
-                    chain_head = element
-                chain_seconds += seconds_for(element)
-                if tie_type == "stop":
-                    close_chain()
-        close_chain()
+
+def _detect_ql_to_seconds(score: stream.Score) -> float:
+    try:
+        marks = list(score.recurse().getElementsByClass(tempo.MetronomeMark))
+        if marks and marks[0].number:
+            return 60.0 / float(marks[0].number)
+    except Exception:
+        pass
+    return 0.5
 
 
 def write_musicxml(score: stream.Score, out_path: Path) -> Path:

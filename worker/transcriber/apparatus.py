@@ -79,12 +79,13 @@ def analyze(wav_path: Path) -> AudioFeatures:
 
 
 def decorate(score: stream.Score, features: AudioFeatures) -> stream.Score:
+    ql_to_seconds = 60.0 / max(features.tempo_bpm, 1.0)
     _set_tempo(score, features.tempo_bpm)
     _set_final_barline(score)
-    _apply_dynamics_per_measure(score, features)
-    _apply_hairpins(score, features)
-    _apply_accents(score, features)
-    _apply_breath_marks(score, features)
+    _apply_dynamics_per_measure(score, features, ql_to_seconds)
+    _apply_hairpins(score, features, ql_to_seconds)
+    _apply_accents(score, features, ql_to_seconds)
+    _apply_breath_marks(score, features, ql_to_seconds)
     return score
 
 
@@ -107,31 +108,41 @@ def _set_final_barline(score: stream.Score) -> None:
         measures[-1].rightBarline = bar.Barline(type="final")
 
 
-def _apply_dynamics_per_measure(score: stream.Score, features: AudioFeatures) -> None:
-    for part in score.parts or [score]:
-        prior_mark: str | None = None
+def _apply_dynamics_per_measure(
+    score: stream.Score, features: AudioFeatures, ql_to_seconds: float
+) -> None:
+    parts = list(score.parts) or [score]
+    anchor = parts[0]
+    decisions: list[tuple[int, str]] = []
+    prior_mark: str | None = None
+    for measure in anchor.getElementsByClass("Measure"):
+        start = float(measure.offset) * ql_to_seconds
+        end = start + float(measure.duration.quarterLength) * ql_to_seconds
+        db = _rms_db_in_range(features, start, end)
+        if math.isnan(db):
+            continue
+        marking = _bucket_dynamic(db)
+        if marking is None or marking == prior_mark:
+            continue
+        decisions.append((measure.number, marking))
+        prior_mark = marking
+
+    for part in parts:
         for measure in part.getElementsByClass("Measure"):
-            start = _measure_start_seconds(measure)
-            end = _measure_end_seconds(measure)
-            db = _rms_db_in_range(features, start, end)
-            if math.isnan(db):
-                continue
-            marking = _bucket_dynamic(db)
-            if marking is None or marking == prior_mark:
-                continue
-            measure.insert(0, dynamics.Dynamic(marking))
-            prior_mark = marking
+            for number, marking in decisions:
+                if measure.number == number:
+                    measure.insert(0, dynamics.Dynamic(marking))
 
 
-def _apply_hairpins(score: stream.Score, features: AudioFeatures) -> None:
+def _apply_hairpins(score: stream.Score, features: AudioFeatures, ql_to_seconds: float) -> None:
     trend = _dynamic_trend_segments(features, HAIRPIN_MIN_SECONDS, HAIRPIN_MIN_DB)
     if not trend:
         return
     parts = list(score.parts) or [score]
     anchor = parts[0]
     for seg_start, seg_end, direction in trend:
-        first = _note_at_or_after(anchor, seg_start)
-        last = _note_at_or_before(anchor, seg_end)
+        first = _note_at_or_after(anchor, seg_start, ql_to_seconds)
+        last = _note_at_or_before(anchor, seg_end, ql_to_seconds)
         if first is None or last is None or first is last:
             continue
         span_class = dynamics.Crescendo if direction > 0 else dynamics.Diminuendo
@@ -140,7 +151,7 @@ def _apply_hairpins(score: stream.Score, features: AudioFeatures) -> None:
         anchor.insert(0, span)
 
 
-def _apply_accents(score: stream.Score, features: AudioFeatures) -> None:
+def _apply_accents(score: stream.Score, features: AudioFeatures, ql_to_seconds: float) -> None:
     if len(features.onset_strength) == 0:
         return
     threshold = float(np.mean(features.onset_strength)) + ACCENT_ONSET_Z * float(
@@ -153,12 +164,11 @@ def _apply_accents(score: stream.Score, features: AudioFeatures) -> None:
     for part in score.parts or [score]:
         for measure in part.getElementsByClass("Measure"):
             added = 0
+            measure_offset = float(measure.offset) * ql_to_seconds
             for note in measure.recurse().notes:
                 if added >= ACCENT_MAX_PER_MEASURE:
                     break
-                t = _element_start_seconds(note)
-                if t is None:
-                    continue
+                t = measure_offset + float(note.offset) * ql_to_seconds
                 near = np.any(np.abs(strong_onsets - t) < 0.06)
                 if near and not any(
                     isinstance(a, (articulations.Accent, articulations.StrongAccent))
@@ -168,14 +178,14 @@ def _apply_accents(score: stream.Score, features: AudioFeatures) -> None:
                     added += 1
 
 
-def _apply_breath_marks(score: stream.Score, features: AudioFeatures) -> None:
+def _apply_breath_marks(score: stream.Score, features: AudioFeatures, ql_to_seconds: float) -> None:
     silences = _silence_gaps(features, threshold_db=-40.0, min_gap=BREATH_GAP_SECONDS)
     if not silences:
         return
     parts = list(score.parts) or [score]
     anchor = parts[0]
     for gap_start, _ in silences:
-        target = _note_at_or_before(anchor, gap_start)
+        target = _note_at_or_before(anchor, gap_start, ql_to_seconds)
         if target is None:
             continue
         if not any(isinstance(a, articulations.BreathMark) for a in target.articulations):
@@ -284,21 +294,37 @@ def _silence_gaps(
     return gaps
 
 
-def _note_at_or_after(part: stream.Part, seconds: float) -> m21note.Note | None:
+def _note_at_or_after(
+    part: stream.Part, seconds: float, ql_to_seconds: float
+) -> m21note.Note | None:
     for note in part.recurse().notes:
-        t = _element_start_seconds(note)
+        t = _note_seconds(note, ql_to_seconds)
         if t is not None and t >= seconds:
             return note
     return None
 
 
-def _note_at_or_before(part: stream.Part, seconds: float) -> m21note.Note | None:
+def _note_at_or_before(
+    part: stream.Part, seconds: float, ql_to_seconds: float
+) -> m21note.Note | None:
     last_match: m21note.Note | None = None
     for note in part.recurse().notes:
-        t = _element_start_seconds(note)
+        t = _note_seconds(note, ql_to_seconds)
         if t is not None and t <= seconds:
             last_match = note
     return last_match
+
+
+def _note_seconds(note, ql_to_seconds: float) -> float | None:
+    try:
+        measure = next(
+            (m for m in note.contextSites() if hasattr(m[0], "number")),
+            None,
+        )
+        measure_offset = float(measure[0].offset) if measure else 0.0
+        return (measure_offset + float(note.offset)) * ql_to_seconds
+    except Exception:
+        return None
 
 
 __all__ = ["AudioFeatures", "analyze", "decorate"]
