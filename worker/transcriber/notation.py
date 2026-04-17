@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from music21 import converter, key, meter, stream, tempo
+from music21 import clef, converter, key, meter, stream, tempo
 
 MIDDLE_C_MIDI = 60
 
@@ -31,6 +31,8 @@ def midi_to_score(midi_path: Path, bpm: float | None = None) -> stream.Score:
     if bpm is not None:
         treble.insert(0, tempo.MetronomeMark(number=float(bpm)))
 
+    treble.insert(0, clef.TrebleClef())
+    bass.insert(0, clef.BassClef())
     treble.insert(0, meter.TimeSignature("4/4"))
     bass.insert(0, meter.TimeSignature("4/4"))
     treble.insert(0, key.KeySignature(0))

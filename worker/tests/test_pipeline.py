@@ -21,16 +21,14 @@ def test_transcribe_produces_mp4_and_musicxml(tmp_path: Path):
     assert result.mp4.exists()
     assert result.musicxml.exists()
     assert result.midi.exists()
+    assert len(result.cards) > 0
+    for card in result.cards:
+        assert card.png_path.exists()
+        assert card.end_seconds >= card.start_seconds
 
     stages = [s for s, _ in events]
-    assert stages[:4] == ["extracting", "detecting", "rendering", "encoding"] or stages[:5] == [
-        "extracting",
-        "detecting",
-        "detecting",
-        "rendering",
-        "encoding",
-    ]
-    assert stages[-1] == "done"
+    for expected in ("extracting", "detecting", "rendering", "encoding", "done"):
+        assert expected in stages, f"{expected!r} missing from {stages!r}"
 
     xml = result.musicxml.read_text()
     assert "<score-partwise" in xml

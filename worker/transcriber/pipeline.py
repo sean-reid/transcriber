@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
-from . import audio, notation, transcription
+from . import audio, notation, rendering, transcription
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class TranscribeResult:
     mp4: Path
     musicxml: Path
     midi: Path
+    cards: list[rendering.MeasureCard]
     timings: dict[str, float]
 
 
@@ -57,7 +58,10 @@ def transcribe(
     mark("rendering", {"label": "engraving notation"})
     score = notation.midi_to_score(midi_path)
     xml_path = notation.write_musicxml(score, output_dir / "transcription.musicxml")
+    cards_dir = output_dir / "cards"
+    cards = rendering.render_measure_cards(xml_path, cards_dir)
     timings["engrave"] = perf_counter() - t2
+    mark("rendering", {"measures": len(cards)})
 
     t3 = perf_counter()
     mark("encoding", {"label": "encoding mp4"})
@@ -67,7 +71,9 @@ def transcribe(
     timings["total"] = perf_counter() - t0
     mark("done", {"mp4": str(mp4_path), "musicxml": str(xml_path), "timings": timings})
 
-    return TranscribeResult(mp4=mp4_path, musicxml=xml_path, midi=midi_path, timings=timings)
+    return TranscribeResult(
+        mp4=mp4_path, musicxml=xml_path, midi=midi_path, cards=cards, timings=timings
+    )
 
 
 def _emit_event(stage: str, extra: dict) -> None:

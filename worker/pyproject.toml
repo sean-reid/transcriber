@@ -11,6 +11,9 @@ dependencies = [
   "setuptools>=70,<75",
   "pretty_midi>=0.2.10",
   "music21>=9.3.0",
+  "verovio>=4.4.0",
+  "playwright>=1.48.0",
+  "pillow>=10.4.0",
 ]
 
 [dependency-groups]
