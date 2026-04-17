@@ -71,6 +71,7 @@ def _toolkit() -> verovio.toolkit:
             "font": "Leipzig",
             "breaks": "none",
             "adjustPageHeight": True,
+            "adjustPageWidth": True,
             "shrinkToFit": True,
             "svgViewBox": True,
             "svgRemoveXlink": True,
@@ -182,12 +183,12 @@ def render_measure_cards(musicxml_path: Path, output_dir: Path) -> list[MeasureC
                     )
 
                     page = browser.new_page(
-                        viewport={"width": CARD_WIDTH_PX, "height": CARD_HEIGHT_PX},
+                        viewport={"width": CARD_WIDTH_PX * 2, "height": CARD_HEIGHT_PX * 2},
                         device_scale_factor=1,
                     )
                     page.set_content(html, wait_until="load")
                     png_path = output_dir / f"measure-{idx:03d}.png"
-                    page.locator(".card").screenshot(path=str(png_path), omit_background=False)
+                    _screenshot_letterboxed(page, png_path)
                     page.close()
 
                     cards.append(
@@ -201,3 +202,71 @@ def render_measure_cards(musicxml_path: Path, output_dir: Path) -> list[MeasureC
         tmp_xml.unlink(missing_ok=True)
 
     return cards
+
+
+def _screenshot_letterboxed(page, png_path: Path) -> None:
+    """Screenshot the rendered SVG's actual content bounding box, then
+    letterbox into a 1080x672 cream card. Verovio's SVG viewBox includes
+    extra whitespace when the music is narrower than the page — we compute
+    the real ink bounds and clip to that.
+    """
+    from PIL import Image
+
+    bbox = page.evaluate(
+        """() => {
+          const svg = document.querySelector('.card svg');
+          if (!svg) return null;
+          const groups = svg.querySelectorAll('g.system, g.measure, g.staffGrp');
+          if (!groups.length) {
+            const r = svg.getBoundingClientRect();
+            return { x: r.left, y: r.top, width: r.width, height: r.height };
+          }
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          groups.forEach(g => {
+            const r = g.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) return;
+            minX = Math.min(minX, r.left);
+            minY = Math.min(minY, r.top);
+            maxX = Math.max(maxX, r.right);
+            maxY = Math.max(maxY, r.bottom);
+          });
+          if (!isFinite(minX)) return null;
+          const pad = 12;
+          return {
+            x: Math.max(0, minX - pad),
+            y: Math.max(0, minY - pad),
+            width: (maxX - minX) + pad * 2,
+            height: (maxY - minY) + pad * 2,
+          };
+        }"""
+    )
+    if bbox is None:
+        page.locator(".card").screenshot(path=str(png_path))
+        return
+
+    raw = png_path.with_suffix(".raw.png")
+    page.screenshot(
+        path=str(raw),
+        clip={
+            "x": bbox["x"],
+            "y": bbox["y"],
+            "width": max(bbox["width"], 16),
+            "height": max(bbox["height"], 16),
+        },
+    )
+
+    with Image.open(raw) as src:
+        avail_w = CARD_WIDTH_PX - CARD_MARGIN * 2
+        avail_h = CARD_HEIGHT_PX - CARD_MARGIN * 2
+        scale = min(avail_w / src.width, avail_h / src.height, 4.0)
+        target_w = max(1, int(src.width * scale))
+        target_h = max(1, int(src.height * scale))
+        resized = src.resize((target_w, target_h), Image.LANCZOS)
+
+        card = Image.new("RGBA", (CARD_WIDTH_PX, CARD_HEIGHT_PX), (250, 245, 238, 255))
+        off_x = (CARD_WIDTH_PX - target_w) // 2
+        off_y = (CARD_HEIGHT_PX - target_h) // 2
+        card.paste(resized, (off_x, off_y))
+        card.convert("RGB").save(png_path, format="PNG", optimize=True)
+
+    raw.unlink(missing_ok=True)
