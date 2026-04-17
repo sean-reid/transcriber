@@ -29,9 +29,13 @@ def polyphonic_transcribe(wav_path: Path) -> pretty_midi.PrettyMIDI:
         _model_output, midi_data, _note_events = predict(
             str(wav_path),
             model_or_model_path=ICASSP_2022_MODEL_PATH,
-            onset_threshold=0.6,
-            frame_threshold=0.4,
-            minimum_note_length=120,
+            # Tuned to match Basic Pitch's reference demo at basicpitch.io —
+            # strong onset threshold (merge notes rather than re-segment) with
+            # a permissive frame threshold (keep quieter notes). Filtering
+            # happens downstream via gap-fill and music21 quantization.
+            onset_threshold=0.9,
+            frame_threshold=0.2,
+            minimum_note_length=11,
             minimum_frequency=55.0,
             maximum_frequency=2093.0,
             multiple_pitch_bends=False,
