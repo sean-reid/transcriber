@@ -43,12 +43,16 @@ def midi_to_score(midi_path: Path, bpm: float | None = None) -> stream.Score:
     bass.insert(0, key.KeySignature(0))
 
     # Ensure both parts cover the same duration so makeMeasures produces
-    # aligned bars. Filling with makeRests() yields a single rest per empty
-    # measure instead of the spray of short rests you get from appending raw
-    # rests from the flattened stream.
+    # aligned bars across both staves. When a part has no notes (e.g., Twinkle
+    # plays only in the treble), insert an anchor rest at the end so the part
+    # knows how long it should be.
+    from music21 import note as m21note
+
     for part in (treble, bass):
-        if part.duration.quarterLength < total_ql:
-            part.insert(total_ql - 0.01, stream.Voice())
+        if part.duration.quarterLength < total_ql and total_ql > 0:
+            anchor = m21note.Rest()
+            anchor.quarterLength = max(total_ql - part.duration.quarterLength, 0.001)
+            part.insert(part.duration.quarterLength, anchor)
 
     score = stream.Score(id="transcription")
     score.metadata = metadata.Metadata()
