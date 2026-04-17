@@ -69,8 +69,8 @@
 
   <section class="stage">
     <div class="frame">
-      <video controls playsinline preload="metadata" src={data.downloadUrl}>
-        <track kind="captions" />
+      <video controls playsinline preload="auto">
+        <source src={data.downloadUrl} type="video/mp4" />
       </video>
     </div>
   </section>
