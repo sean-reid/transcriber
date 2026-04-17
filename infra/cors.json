@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://transcriber.pages.dev", "http://localhost:5173"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "Content-Length", "Content-Range"],
+    "MaxAgeSeconds": 3600
+  }
+]
