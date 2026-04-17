@@ -28,6 +28,12 @@ export default [
     }
   },
   {
+    files: ['**/app.d.ts'],
+    rules: {
+      '@typescript-eslint/no-empty-object-type': 'off'
+    }
+  },
+  {
     ignores: ['build/', '.svelte-kit/', 'dist/']
   }
 ];

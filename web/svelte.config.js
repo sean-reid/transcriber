@@ -11,7 +11,12 @@ const config = {
         'default-src': ['self'],
         'img-src': ['self', 'data:', 'blob:'],
         'media-src': ['self', 'blob:', 'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev'],
-        'connect-src': ['self', 'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev', 'https://*.modal.run'],
+        'connect-src': [
+          'self',
+          'https://*.r2.cloudflarestorage.com',
+          'https://*.r2.dev',
+          'https://*.modal.run'
+        ],
         'script-src': ['self'],
         'style-src': ['self', 'unsafe-inline'],
         'font-src': ['self', 'data:'],
