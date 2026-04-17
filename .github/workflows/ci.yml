@@ -11,8 +11,11 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.11"
   PNPM_VERSION: "9"
+  UV_COMPILE_BYTECODE: "1"
+  UV_LINK_MODE: "copy"
+  UV_SYSTEM_PYTHON: "0"
 
 jobs:
   web:
@@ -33,8 +36,21 @@ jobs:
       - run: pnpm --filter web test
       - run: pnpm --filter web build
 
-  worker:
-    name: worker
+  worker-lint:
+    name: worker-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: worker
+          version: "0.15.11"
+      - name: Ruff format check
+        run: ruff format --check .
+        working-directory: worker
+
+  worker-test:
+    name: worker-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,16 +58,18 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: worker/uv.lock
-      - uses: actions/setup-python@v5
-        with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: uv sync --locked
+      - name: Cache uv venv
+        uses: actions/cache@v4
+        with:
+          path: worker/.venv
+          key: uv-venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('worker/uv.lock') }}
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: uv sync --frozen
         working-directory: worker
-      - run: uv run ruff check .
-        working-directory: worker
-      - run: uv run ruff format --check .
-        working-directory: worker
-      - run: uv run pytest -q
+      - name: Pytest (all markers)
+        run: uv run pytest -m "slow or not slow" --maxfail=1
         working-directory: worker
 
   e2e:
@@ -67,6 +85,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: worker/uv.lock
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Cache uv venv
+        uses: actions/cache@v4
+        with:
+          path: worker/.venv
+          key: uv-venv-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('worker/uv.lock') }}
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: uv sync --frozen
+        working-directory: worker
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
       - name: Cache Playwright browsers
