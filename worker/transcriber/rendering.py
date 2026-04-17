@@ -55,13 +55,13 @@ def _toolkit() -> verovio.toolkit:
     tk = verovio.toolkit()
     tk.setOptions(
         {
-            "pageWidth": 2160,
-            "pageHeight": 1344,
-            "pageMarginTop": 40,
-            "pageMarginBottom": 40,
-            "pageMarginLeft": 40,
-            "pageMarginRight": 40,
-            "scale": 60,
+            "pageWidth": 1800,
+            "pageHeight": 1120,
+            "pageMarginTop": 20,
+            "pageMarginBottom": 20,
+            "pageMarginLeft": 20,
+            "pageMarginRight": 20,
+            "scale": 80,
             "font": "Leipzig",
             "breaks": "none",
             "adjustPageHeight": True,
@@ -69,13 +69,29 @@ def _toolkit() -> verovio.toolkit:
             "svgViewBox": True,
             "svgRemoveXlink": True,
             "smuflTextFont": "embedded",
+            "systemDivider": "none",
+            "hideEmptyStaves": False,
         }
     )
     return tk
 
 
-def _excerpt_measure(score: stream.Score, measure_index: int) -> stream.Score:
-    excerpt = score.measures(measure_index, measure_index, collect=[])
+def _excerpt_window(score: stream.Score, measure_index: int, lookahead: int = 1) -> stream.Score:
+    """Excerpt the current measure plus a lookahead window so ties to the
+    following measure render as proper arcs rather than being clipped off.
+    """
+    end = measure_index + lookahead
+    excerpt = score.measures(
+        measure_index,
+        end,
+        collect=("Clef", "TimeSignature", "KeySignature", "Instrument"),
+    )
+    if excerpt is None or not excerpt.recurse().getElementsByClass("Measure"):
+        excerpt = score.measures(
+            measure_index,
+            measure_index,
+            collect=("Clef", "TimeSignature", "KeySignature", "Instrument"),
+        )
     if excerpt is None:
         raise ValueError(f"measure {measure_index} missing")
     return excerpt
@@ -121,7 +137,7 @@ def render_measure_cards(musicxml_path: Path, output_dir: Path) -> list[MeasureC
             browser = pw.chromium.launch(args=["--disable-web-security"])
             try:
                 for idx, start, end in timings:
-                    excerpt = _excerpt_measure(score, idx)
+                    excerpt = _excerpt_window(score, idx)
                     excerpt.write("musicxml", fp=str(tmp_xml))
 
                     tk = _toolkit()

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 
-from . import audio, notation, rendering, transcription
+from . import audio, compose, notation, rendering, transcription
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,8 @@ def transcribe(
 
     t3 = perf_counter()
     mark("encoding", {"label": "encoding mp4"})
-    mp4_path = audio.normalize_to_h264_aac(input_path, output_dir / "output.mp4")
+    normalized = audio.normalize_to_h264_aac(input_path, output_dir / "source.mp4")
+    mp4_path = compose.compose(normalized, cards, output_dir / "output.mp4")
     timings["encode"] = perf_counter() - t3
 
     timings["total"] = perf_counter() - t0
