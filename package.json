@@ -1,0 +1,21 @@
+{
+  "name": "transcriber",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web check",
+    "test": "pnpm --filter web test",
+    "test:e2e": "pnpm --filter tests test",
+    "worker:dev": "uv run --directory worker modal serve app.py",
+    "worker:test": "uv run --directory worker pytest",
+    "worker:lint": "uv run --directory worker ruff check ."
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  }
+}
