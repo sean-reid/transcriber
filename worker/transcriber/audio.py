@@ -35,8 +35,12 @@ def extract_mono_wav(input_path: Path, output_wav: Path, sample_rate: int = SAMP
     return output_wav
 
 
-def copy_faststart(input_path: Path, output_mp4: Path) -> Path:
-    """Remux input into a streaming-friendly MP4 without re-encoding."""
+def normalize_to_h264_aac(input_path: Path, output_mp4: Path) -> Path:
+    """Re-encode input to browser-universal H.264 + AAC with fast-start metadata.
+
+    Using -c copy would preserve HEVC or other codecs that some browsers can't
+    decode. Re-encoding guarantees playback on Chrome, Safari, Firefox, Edge.
+    """
     output_mp4.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         "ffmpeg",
@@ -45,8 +49,30 @@ def copy_faststart(input_path: Path, output_mp4: Path) -> Path:
         "error",
         "-i",
         str(input_path),
-        "-c",
-        "copy",
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-pix_fmt",
+        "yuv420p",
+        "-profile:v",
+        "high",
+        "-level",
+        "4.0",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ac",
+        "2",
+        "-ar",
+        "44100",
         "-movflags",
         "+faststart",
         str(output_mp4),

@@ -61,7 +61,7 @@ def transcribe(
 
     t3 = perf_counter()
     mark("encoding", {"label": "encoding mp4"})
-    mp4_path = audio.copy_faststart(input_path, output_dir / "output.mp4")
+    mp4_path = audio.normalize_to_h264_aac(input_path, output_dir / "output.mp4")
     timings["encode"] = perf_counter() - t3
 
     timings["total"] = perf_counter() - t0
