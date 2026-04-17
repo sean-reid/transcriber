@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = Number(process.env.PORT ?? 4173);
+const PORT = Number(process.env.PORT ?? 5173);
 const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
 const CI = !!process.env.CI;
 
@@ -23,8 +23,8 @@ export default defineConfig({
     { name: 'pixel-7', use: { ...devices['Pixel 7'] } }
   ],
   webServer: {
-    command: `pnpm --filter web preview --port ${PORT} --strictPort`,
-    port: PORT,
+    command: `pnpm --filter web dev --host 127.0.0.1 --port ${PORT} --strictPort`,
+    url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !CI,
     stdout: 'pipe',
     stderr: 'pipe',
