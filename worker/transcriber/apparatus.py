@@ -54,6 +54,27 @@ ACCENT_MAX_PER_MEASURE = 1
 BREATH_GAP_SECONDS = 0.4
 
 
+def _prefer_musical_bpm(bpm: float) -> float:
+    """Collapse tempo-tracker octave errors into the 60-140 comfort zone.
+
+    Beat trackers frequently lock onto 2x or 0.5x the true tempo (the
+    "octave error" problem in beat estimation). Most music sits between
+    60 and 140 BPM; values outside are usually aliases. We halve if too
+    fast, double if too slow, until we're in range.
+    """
+    if bpm <= 0:
+        return 120.0
+    value = float(bpm)
+    for _ in range(4):
+        if value > 140:
+            value /= 2
+        elif value < 60:
+            value *= 2
+        else:
+            break
+    return value
+
+
 def analyze(wav_path: Path) -> AudioFeatures:
     y, sr = librosa.load(str(wav_path), sr=22050, mono=True)
     rms = librosa.feature.rms(y=y)[0]
@@ -63,8 +84,13 @@ def analyze(wav_path: Path) -> AudioFeatures:
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     onset_times = librosa.times_like(onset_env, sr=sr, hop_length=512)
 
-    bpm_arr = librosa.beat.tempo(y=y, sr=sr, aggregate=None)
-    tempo_bpm = float(np.median(bpm_arr)) if len(bpm_arr) else 120.0
+    tempo_estimate, _beats = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, units="time")
+    if hasattr(tempo_estimate, "__iter__"):
+        tempo_arr = np.asarray(list(tempo_estimate))
+        raw_bpm = float(tempo_arr.flatten()[0]) if tempo_arr.size else 120.0
+    else:
+        raw_bpm = float(tempo_estimate) if tempo_estimate else 120.0
+    tempo_bpm = _prefer_musical_bpm(raw_bpm)
 
     return AudioFeatures(
         y=y,
