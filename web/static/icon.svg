@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" shape-rendering="geometricPrecision">
+  <rect width="180" height="180" rx="34" fill="#F8F5EE"/>
+  <line x1="50" y1="118" x2="130" y2="118" stroke="#BE3A1F" stroke-width="8" stroke-linecap="round"/>
+  <g transform="rotate(-22 90 118)">
+    <ellipse cx="90" cy="118" rx="31" ry="21" fill="#111111"/>
+  </g>
+  <line x1="118" y1="110" x2="118" y2="33" stroke="#111111" stroke-width="12" stroke-linecap="round"/>
+</svg>

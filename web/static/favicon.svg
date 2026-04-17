@@ -1,11 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#FAFAF7"/>
-  <g stroke="#1A1A1A" stroke-width="1" fill="none">
-    <line x1="4" y1="10" x2="28" y2="10"/>
-    <line x1="4" y1="14" x2="28" y2="14"/>
-    <line x1="4" y1="18" x2="28" y2="18"/>
-    <line x1="4" y1="22" x2="28" y2="22"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="geometricPrecision">
+  <rect width="32" height="32" rx="6" fill="#F8F5EE"/>
+  <line x1="9" y1="21" x2="23" y2="21" stroke="#BE3A1F" stroke-width="1.6" stroke-linecap="round"/>
+  <g transform="rotate(-22 16 21)">
+    <ellipse cx="16" cy="21" rx="5.6" ry="3.8" fill="#111111"/>
   </g>
-  <circle cx="22" cy="16" r="3" fill="#1A1A1A"/>
-  <line x1="25" y1="16" x2="25" y2="6" stroke="#1A1A1A" stroke-width="1"/>
+  <line x1="21" y1="19.5" x2="21" y2="6" stroke="#111111" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
