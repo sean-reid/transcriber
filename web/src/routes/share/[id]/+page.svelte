@@ -155,8 +155,8 @@
   video {
     display: block;
     width: 100%;
+    height: auto;
     max-height: 80vh;
-    aspect-ratio: 9 / 16;
     object-fit: contain;
     background: #000;
   }
